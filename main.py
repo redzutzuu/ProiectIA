@@ -3,6 +3,14 @@ import random
 import tkinter as tk
 from tkinter import messagebox
 
+def center_window(window, width_ratio=0.75, height_ratio=0.75):
+    screen_width = window.winfo_screenwidth()
+    screen_height = window.winfo_screenheight()
+    width = int(screen_width * width_ratio)
+    height = int(screen_height * height_ratio)
+    x = (screen_width - width) // 2
+    y = (screen_height - height) // 2
+    window.geometry(f"{width}x{height}+{x}+{y}")
 
 def minimax(depth, is_maximizing, sticks, alpha, beta, max_picks):
     if sticks == 0:
@@ -30,10 +38,8 @@ def minimax(depth, is_maximizing, sticks, alpha, beta, max_picks):
                 break
         return min_eval
 
-
 def bot_move(sticks, max_picks, max_depth, factor=3):
     depth = min(max_depth, max(1, sticks // factor))
-
     best_move = None
     best_value = -math.inf
     for i in range(1, min(max_picks, sticks) + 1):
@@ -43,55 +49,86 @@ def bot_move(sticks, max_picks, max_depth, factor=3):
             best_move = i
     return best_move
 
+def display_gramezi(gramezi, frame):
+    for widget in frame.winfo_children():
+        widget.destroy()
 
-def update_game_state(gramezi, max_picks, depth, player_turn, frame, inputs):
+    max_per_row = 5
+    for idx, sticks in enumerate(gramezi):
+        row = idx // max_per_row
+        col = idx % max_per_row
+        pile_frame = tk.Frame(frame, bg="lightblue", bd=2, relief="groove")
+        pile_frame.grid(row=row, column=col, padx=15, pady=15)
+
+        tk.Label(
+            pile_frame,
+            text=f"Gramada {idx + 1}: {sticks} bete",
+            font=("Arial", 12, "bold"),
+            bg="lightblue"
+        ).pack()
+
+        # Afișare pe linii de câte 7 bețe
+        stick_frame = tk.Frame(pile_frame, bg="lightblue")
+        stick_frame.pack()
+        for i in range(sticks):
+            if i > 0 and i % 7 == 0:
+                stick_frame = tk.Frame(pile_frame, bg="lightblue")
+                stick_frame.pack()
+            tk.Label(
+                stick_frame,
+                text="\u25A0",
+                font=("Arial", 18),
+                bg="green",
+                width=2,
+                height=1
+            ).pack(side=tk.LEFT, padx=2)
+
+
+
+def update_game_state(gramezi, max_picks, depth, player_turn, frame, inputs_frame):
     if sum(gramezi) <= 0:
         if player_turn:
-            messagebox.showinfo("Joc terminat", "Ai pierdut! Botul a câștigat.")
+            messagebox.showinfo("Joc terminat", "Ai pierdut! Botul a castigat.")
         else:
-            messagebox.showinfo("Joc terminat", "Felicitări! Ai câștigat împotriva botului.")
-        frame.destroy()
-        setup_game(frame.master)
+            messagebox.showinfo("Joc terminat", "Felicitari! Ai castigat impotriva botului.")
+        frame.master.destroy()
         return
 
     display_gramezi(gramezi, frame)
 
+    for widget in inputs_frame.winfo_children():
+        widget.destroy()
+
     if not player_turn:
         bot_choice, grămadă_idx = bot_decide(gramezi, max_picks, depth)
         gramezi[grămadă_idx] -= bot_choice
-        messagebox.showinfo("Botul a mutat", f"Botul a luat {bot_choice} bețe din grămada {grămadă_idx + 1}.")
-        update_game_state(gramezi, max_picks, depth, True, frame, inputs)
+        messagebox.showinfo("Botul a mutat", f"Botul a luat {bot_choice} bete din gramada {grămadă_idx + 1}.")
+        update_game_state(gramezi, max_picks, depth, True, frame, inputs_frame)
     else:
-        for widget in inputs.values():
-            widget.destroy()
-
-        tk.Label(frame, text="Introduceți grămada și numărul de bețe:", font=("Arial", 12), bg="lightblue").pack(pady=5)
-        pile_input = tk.Entry(frame, font=("Arial", 12))
+        tk.Label(inputs_frame, text="Introduceti gramada :", font=("Arial", 12), bg="lightblue").pack(pady=5)
+        pile_input = tk.Entry(inputs_frame, font=("Arial", 12))
         pile_input.pack(pady=5)
-        stick_input = tk.Entry(frame, font=("Arial", 12))
+        tk.Label(inputs_frame, text="Introduceti numarul de bete:", font=("Arial", 12), bg="lightblue").pack(
+            pady=5)
+        stick_input = tk.Entry(inputs_frame, font=("Arial", 12))
         stick_input.pack(pady=5)
 
-        inputs['pile_input'] = pile_input
-        inputs['stick_input'] = stick_input
+        def on_player_move():
+            try:
+                grămadă_idx = int(pile_input.get()) - 1
+                sticks_to_remove = int(stick_input.get())
 
-        tk.Button(frame, text="Mutare", font=("Arial", 12), command=lambda: on_player_move(gramezi, max_picks, depth, frame, inputs)).pack(pady=10)
-        tk.Button(frame, text="Înapoi", font=("Arial", 12), command=lambda: [frame.pack_forget(), show_menu()]).pack(pady=5)
-        tk.Button(frame, text="Exit", font=("Arial", 14), command=root.destroy).pack(pady=10)
+                if 0 <= grămadă_idx < len(gramezi) and 1 <= sticks_to_remove <= min(max_picks, gramezi[grămadă_idx]):
+                    gramezi[grămadă_idx] -= sticks_to_remove
+                    update_game_state(gramezi, max_picks, depth, False, frame, inputs_frame)
+                else:
+                    messagebox.showerror("Eroare", "Introdu o gramada valida si un numar valid de bete.")
+            except ValueError:
+                messagebox.showerror("Eroare", "Introdu o gramada valida si un numar de bete.")
 
-
-def on_player_move(gramezi, max_picks, depth, frame, inputs):
-    try:
-        grămadă_idx = int(inputs['pile_input'].get()) - 1
-        sticks_to_remove = int(inputs['stick_input'].get())
-
-        if 0 <= grămadă_idx < len(gramezi) and 1 <= sticks_to_remove <= min(max_picks, gramezi[grămadă_idx]):
-            gramezi[grămadă_idx] -= sticks_to_remove
-            update_game_state(gramezi, max_picks, depth, False, frame, inputs)
-        else:
-            messagebox.showerror("Eroare", "Introdu o grămadă validă și un număr valid de bețe.")
-    except ValueError:
-        messagebox.showerror("Eroare", "Introdu o grămadă validă și un număr de bețe.")
-
+        tk.Button(inputs_frame, text="Mutare", font=("Arial", 14), bg="#ADD8E6", command=on_player_move).pack(pady=10)
+        tk.Button(inputs_frame, text="Înapoi", font=("Arial", 14),  bg="#ADD8E6",command=lambda: [inputs_frame.pack_forget(), show_menu()]).pack(pady=10)
+        tk.Button(inputs_frame, text="Exit", font=("Arial", 14),  bg="#ADD8E6",command=root.destroy).pack(pady=10)
 
 def bot_decide(gramezi, max_picks, depth):
     for grămadă_idx, sticks in enumerate(gramezi):
@@ -103,44 +140,56 @@ def bot_decide(gramezi, max_picks, depth):
     return 1, 0
 
 
-def display_gramezi(gramezi, frame):
-    for widget in frame.winfo_children():
-        widget.destroy()
-
-    for grămadă_idx, sticks in enumerate(gramezi):
-        row_frame = tk.Frame(frame)
-        row_frame.pack()
-        tk.Label(row_frame, text=f"Grămada {grămadă_idx + 1}:", font=("Arial", 12)).pack(side=tk.LEFT)
-        for _ in range(sticks):
-            tk.Label(row_frame, text="■", font=("Arial", 12), fg="green").pack(side=tk.LEFT)
+import random
 
 
 def generate_gramezi(total_bete, num_gramezi):
-    # Generăm intervale de valori posibile pentru fiecare grămadă.
-    min_sticks = 1
-    max_sticks = total_bete // num_gramezi
-    gramezi = []
+    # Calculează distribuția inițială uniformă
+    base_bete = total_bete // num_gramezi
+    gramezi = [base_bete] * num_gramezi
 
-    # Calculăm o sumă aleatorie mai variabilă
-    bete_ramase = total_bete
+    # Distribuie restul de bețe rămase
+    bete_ramase = total_bete - sum(gramezi)
+    for i in range(bete_ramase):
+        gramezi[random.randint(0, num_gramezi - 1)] += 1
 
-    for i in range(num_gramezi - 1):
-        # Alegem o valoare aleatorie între 1 și max_sticks (dar asigurăm că nu depășim bețele rămase)
-        max_possible = min(max_sticks, bete_ramase - (num_gramezi - i - 1))  # Evită dublările la final
-        betele = random.randint(min_sticks, max_possible)
-        gramezi.append(betele)
-        bete_ramase -= betele
+    # Introduce o variație aleatorie pentru diversitate
+    for i in range(num_gramezi):
+        if gramezi[i] > 1:  # Asigură-te că grămada nu devine 0
+            schimb = random.randint(-1, 1)  # Mică variație: poate adăuga/scădea 1
+            gramezi[i] += schimb
+            # Ajustează altă grămadă pentru a păstra totalul constant
+            alt_index = random.randint(0, num_gramezi - 1)
+            while alt_index == i:
+                alt_index = random.randint(0, num_gramezi - 1)
+            gramezi[alt_index] -= schimb
 
-    gramezi.append(bete_ramase)
+    # Asigură-te că toate grămezile au cel puțin un băț
+    for i in range(num_gramezi):
+        if gramezi[i] <= 0:
+            gramezi[i] = 1
 
-    # Opțional: Reordonăm aleatoriu grămezile pentru a distribui mai random
+    # Amestecă grămezile pentru diversitate suplimentară
     random.shuffle(gramezi)
+
+    # Asigură-te că suma totală e corectă
+    assert sum(gramezi) == total_bete, "Suma totală a bețelor nu este corectă!"
 
     return gramezi
 
 
-
 def start_game(frame, total_bete, num_gramezi, max_picks):
+    if total_bete <= 0 or num_gramezi <= 0 or max_picks <= 0:
+        messagebox.showerror("Eroare", "Toate valorile trebuie să fie mai mari ca zero!")
+        return
+
+    if total_bete < num_gramezi:
+        messagebox.showerror("Eroare", "Numărul total de bețe trebuie să fie cel puțin egal cu numărul de grămezi!")
+        return
+    if max_picks <= 0 or max_picks > (total_bete - num_gramezi):
+        messagebox.showerror("Eroare", "Numărul maxim de bețe a unei mutări este prea mare!\n "
+                                       "Vă rog sa aveți maxim: (total_bețe)-(număr_grămezi)")
+        return
     gramezi = generate_gramezi(total_bete, num_gramezi)
     depth = max(1, min(10, total_bete // 3))
 
@@ -148,50 +197,60 @@ def start_game(frame, total_bete, num_gramezi, max_picks):
     game_frame = tk.Frame(frame.master, bg="lightblue")
     game_frame.pack(fill=tk.BOTH, expand=True)
 
-    inputs = {}
-    update_game_state(gramezi, max_picks, depth, True, game_frame, inputs)
+    inputs_frame = tk.Frame(frame.master, bg="lightblue")
+    inputs_frame.pack(fill=tk.BOTH, expand=True)
 
+    update_game_state(gramezi, max_picks, depth, True, game_frame, inputs_frame)
 
 def show_menu():
+    def reguli():
+        info_text = (
+            "Acesta este jocul Nim.\n\n"
+            "Reguli:\n"
+            "1. Jocul începe cu un număr de grămezi, fiecare conținând un anumit număr de obiecte.\n"
+            "2. Jucătorii, pe rând, pot lua unul sau mai multe obiecte dintr-o singură grămadă.\n"
+            "3. Scopul jocului poate varia:\n"
+            "   - În varianta standard, pierde jucătorul care ia ultimul obiect.\n"
+            "   - În varianta misère, câștigă jucătorul care ia ultimul obiect.\n"
+            "\nBucurați-vă de acest joc de strategie simplu dar captivant!"
+        )
+        messagebox.showinfo("Despre", info_text)
     for widget in root.winfo_children():
         widget.destroy()
 
-    frame = tk.Frame(root, bg="lightblue")
+    frame = tk.Frame(root, bg="#f0f8ff")
     frame.pack(fill=tk.BOTH, expand=True)
 
-    tk.Label(frame, text="Jocul Nim", font=("Arial", 20), bg="lightblue").pack(pady=20)
+    tk.Label(frame, text="Jocul Nim", font=("Arial", 24, "bold"), bg="#f0f8ff").pack(pady=40)
 
-    tk.Button(frame, text="Joacă", font=("Arial", 14), command=lambda: show_settings(frame)).pack(pady=10)
-    tk.Button(frame, text="Info", font=("Arial", 14), command=lambda: messagebox.showinfo("Info", "Acesta este jocul Nim!")).pack(pady=10)
-    tk.Button(frame, text="Creatori", font=("Arial", 14), command=lambda: messagebox.showinfo("Creatori", "Creat de [Nume].")).pack(pady=10)
-    tk.Button(frame, text="Exit", font=("Arial", 14), command=root.destroy).pack(pady=10)
-
+    tk.Button(frame, text="Joaca", font=("Arial", 16), bg="#87CEEB", command=lambda: show_settings(frame)).pack(pady=20)
+    tk.Button(frame, text="Informatii", font=("Arial", 14), command=lambda: reguli()).pack(pady=20)
+    tk.Button(frame, text="Creatori", font=("Arial", 14),bg="#87CEEB",command=lambda: messagebox.showinfo("Creatori", "Verșanu George-David \n Alexandru Spătaru")).pack(pady=20)
+    tk.Button(frame, text="Exit", font=("Arial", 16), bg="#FF6347", command=root.destroy).pack(pady=20)
 
 def show_settings(frame):
     frame.pack_forget()
-    settings_frame = tk.Frame(root, bg="lightblue")
+    settings_frame = tk.Frame(root, bg="#f0f8ff")
     settings_frame.pack(fill=tk.BOTH, expand=True)
 
-    tk.Label(settings_frame, text="Reguli de Joc", font=("Arial", 16), bg="lightblue").pack(pady=10)
+    tk.Label(settings_frame, text="Setari Joc", font=("Arial", 20, "bold"), bg="#f0f8ff").pack(pady=20)
 
-    tk.Label(settings_frame, text="Număr total de bețe:", font=("Arial", 12), bg="lightblue").pack(pady=5)
-    sticks_entry = tk.Entry(settings_frame, font=("Arial", 12))
+    tk.Label(settings_frame, text="Numar total de bete:", font=("Arial", 14), bg="#f0f8ff").pack(pady=5)
+    sticks_entry = tk.Entry(settings_frame, font=("Arial", 14))
     sticks_entry.pack()
     sticks_entry.insert(0, "15")
 
-    tk.Label(settings_frame, text="Număr de grămezi:", font=("Arial", 12), bg="lightblue").pack(pady=5)
-    piles_entry = tk.Entry(settings_frame, font=("Arial", 12))
+    tk.Label(settings_frame, text="Numar de gramezi:", font=("Arial", 14), bg="#f0f8ff").pack(pady=5)
+    piles_entry = tk.Entry(settings_frame, font=("Arial", 14))
     piles_entry.pack()
     piles_entry.insert(0, "3")
 
-    tk.Label(settings_frame, text="Număr maxim de bețe per mutare:", font=("Arial", 12), bg="lightblue").pack(pady=5)
-    max_picks_entry = tk.Entry(settings_frame, font=("Arial", 12))
+    tk.Label(settings_frame, text="Numar maxim de bete per mutare:", font=("Arial", 14), bg="#f0f8ff").pack(pady=5)
+    max_picks_entry = tk.Entry(settings_frame, font=("Arial", 14))
     max_picks_entry.pack()
     max_picks_entry.insert(0, "3")
 
-    tk.Button(settings_frame, text="Înapoi", font=("Arial", 12), command=lambda: [settings_frame.pack_forget(), show_menu()]).pack(pady=5)
-
-    tk.Button(settings_frame, text="Începe", font=("Arial", 12),
+    tk.Button(settings_frame, text="Incepe", font=("Arial", 14), bg="#32CD32",
               command=lambda: start_game(
                   settings_frame,
                   int(sticks_entry.get()),
@@ -199,15 +258,16 @@ def show_settings(frame):
                   int(max_picks_entry.get())
               )).pack(pady=20)
 
+    tk.Button(settings_frame, text="Inapoi", font=("Arial", 14), bg="#87CEEB",
+              command=lambda: [settings_frame.pack_forget(), show_menu()]).pack(pady=10)
 
 def setup_game(root):
     show_menu()
 
-
 if __name__ == "__main__":
     root = tk.Tk()
     root.title("Jocul Nim")
-    root.geometry("400x500")
+    center_window(root, 0.75, 0.75)
     root.resizable(False, False)
     setup_game(root)
     root.mainloop()
